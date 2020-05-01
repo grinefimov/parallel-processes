@@ -4,10 +4,21 @@ use std::thread;
 use std::time::Duration;
 extern crate chrono;
 use chrono::Utc;
-
-type Amoi = Arc<Mutex<Option<i32>>>;
+// use std::io;
 
 const DELAY: u64 = 0;
+
+struct Result1 {
+    f1: Option<i32>,
+    f2: Option<i32>,
+    f7: Option<i32>,
+}
+
+struct Result2 {
+    f4: Option<i32>,
+    f5: Option<i32>,
+    f6: Option<i32>,
+}
 
 fn main() {
     let (tx, rx) = mpsc::channel::<i32>();
@@ -15,6 +26,12 @@ fn main() {
     thread::spawn(|| a_task(tx));
 
     println!("Result: {}", rx.iter().next().unwrap());
+
+    // let mut option = String::new();
+    // match io::stdin().read_line(&mut option) {
+    //     Ok(_) => {}
+    //     Err(e) => eprintln!("Read error: {}", e),
+    // }
 }
 
 fn a_task(tx: mpsc::Sender<i32>) {
@@ -26,21 +43,19 @@ fn a_task(tx: mpsc::Sender<i32>) {
     let m2 = [4, 5, 6];
     let m3 = [7, 8, 8];
 
-    let f1 = Arc::new(Mutex::new(Option::<i32>::None));
-    let f2 = Arc::new(Mutex::new(Option::<i32>::None));
-    let f7 = Arc::new(Mutex::new(Option::<i32>::None));
+    let result1 = Arc::new(Mutex::new(Result1 {
+        f1: Option::<i32>::None,
+        f2: Option::<i32>::None,
+        f7: Option::<i32>::None,
+    }));
 
-    let f1b = Arc::clone(&f1);
-    let f2b = Arc::clone(&f2);
-    let f7b = Arc::clone(&f7);
     let txb = mpsc::Sender::clone(&tx);
-    thread::spawn(move || b_task(txb, m1, m2, m3, f1b, f2b, f7b));
-    let f1c = Arc::clone(&f1);
-    let f2c = Arc::clone(&f2);
-    let f7c = Arc::clone(&f7);
+    let result1b = Arc::clone(&result1);
+    thread::spawn(move || b_task(txb, m1, m2, m3, result1b));
     let txc = mpsc::Sender::clone(&tx);
-    thread::spawn(move || c_task(txc, m1, m2, m3, f1c, f2c, f7c));
-    thread::spawn(move || d_task(tx, m1, m2, m3, f1, f2, f7));
+    let result1c = Arc::clone(&result1);
+    thread::spawn(move || c_task(txc, m1, m2, m3, result1c));
+    thread::spawn(move || d_task(tx, m1, m2, m3, result1));
 
     println!("A ends at {}", Utc::now().time());
 }
@@ -50,9 +65,7 @@ fn b_task(
     m1: [i32; 3],
     m2: [i32; 3],
     m3: [i32; 3],
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("B started at {}", Utc::now().time());
     println!("B activated by Taks A");
@@ -61,14 +74,13 @@ fn b_task(
 
     let s = m1.iter().sum::<i32>() + m2.iter().sum::<i32>() + m3.iter().sum::<i32>();
 
-    let mut result = f1.lock().unwrap();
-    *result = Some(s);
+    let mut result = result1.lock().unwrap();
+    result.f1 = Some(s);
 
-    match *(f2.lock().unwrap()) {
-        Some(b) => match *(f7.lock().unwrap()) {
+    match result.f2 {
+        Some(b) => match result.f7 {
             Some(c) => {
-                let a = (*result).unwrap();
-                thread::spawn(move || k_task(tx, a, b, c, "B"));
+                thread::spawn(move || k_task(tx, s, b, c, "B"));
             }
             None => {}
         },
@@ -83,9 +95,7 @@ fn c_task(
     m1: [i32; 3],
     m2: [i32; 3],
     m3: [i32; 3],
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("C started at {}", Utc::now().time());
     println!("C activated by Taks A");
@@ -94,14 +104,13 @@ fn c_task(
 
     let s = m1.iter().sum::<i32>() + m2.iter().sum::<i32>() + m3.iter().sum::<i32>();
 
-    let mut result = f2.lock().unwrap();
-    *result = Some(s);
+    let mut result = result1.lock().unwrap();
+    result.f2 = Some(s);
 
-    match *(f1.lock().unwrap()) {
-        Some(a) => match *(f7.lock().unwrap()) {
+    match result.f1 {
+        Some(a) => match result.f7 {
             Some(c) => {
-                let b = (*result).unwrap();
-                thread::spawn(move || k_task(tx, a, b, c, "C"));
+                thread::spawn(move || k_task(tx, a, s, c, "C"));
             }
             None => {}
         },
@@ -116,9 +125,7 @@ fn d_task(
     m1: [i32; 3],
     m2: [i32; 3],
     m3: [i32; 3],
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("D started at {}", Utc::now().time());
     println!("D activated by Taks A");
@@ -127,27 +134,21 @@ fn d_task(
 
     let s = m1.iter().sum::<i32>() + m2.iter().sum::<i32>() + m3.iter().sum::<i32>();
 
-    let f4 = Arc::new(Mutex::new(Option::<i32>::None));
-    let f5 = Arc::new(Mutex::new(Option::<i32>::None));
-    let f6 = Arc::new(Mutex::new(Option::<i32>::None));
+    let result2 = Arc::new(Mutex::new(Result2 {
+        f4: Option::<i32>::None,
+        f5: Option::<i32>::None,
+        f6: Option::<i32>::None,
+    }));
 
-    let f4e = Arc::clone(&f4);
-    let f5e = Arc::clone(&f5);
-    let f6e = Arc::clone(&f6);
-    let f1e = Arc::clone(&f1);
-    let f2e = Arc::clone(&f2);
-    let f7e = Arc::clone(&f7);
     let txe = mpsc::Sender::clone(&tx);
-    thread::spawn(move || e_task(txe, s, f4e, f5e, f6e, f1e, f2e, f7e));
-    let f4f = Arc::clone(&f4);
-    let f5f = Arc::clone(&f5);
-    let f6f = Arc::clone(&f6);
-    let f1f = Arc::clone(&f1);
-    let f2f = Arc::clone(&f2);
-    let f7f = Arc::clone(&f7);
+    let result2e = Arc::clone(&result2);
+    let result1e = Arc::clone(&result1);
+    thread::spawn(move || e_task(txe, s, result2e, result1e));
     let txf = mpsc::Sender::clone(&tx);
-    thread::spawn(move || f_task(txf, s, f4f, f5f, f6f, f1f, f2f, f7f));
-    thread::spawn(move || g_task(tx, s, f4, f5, f6, f1, f2, f7));
+    let result2f = Arc::clone(&result2);
+    let result1f = Arc::clone(&result1);
+    thread::spawn(move || f_task(txf, s, result2f, result1f));
+    thread::spawn(move || g_task(tx, s, result2, result1));
 
     println!("D ends at {}", Utc::now().time());
 }
@@ -155,26 +156,22 @@ fn d_task(
 fn e_task(
     tx: mpsc::Sender<i32>,
     n: i32,
-    f4: Amoi,
-    f5: Amoi,
-    f6: Amoi,
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result2: Arc<Mutex<Result2>>,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("E started at {}", Utc::now().time());
     println!("E activated by Taks D");
 
     thread::sleep(Duration::from_millis(DELAY));
 
-    let mut result = f4.lock().unwrap();
-    *result = Some(n * 4);
+    let mut result = result2.lock().unwrap();
+    let r = n * 4;
+    result.f4 = Some(r);
 
-    match *(f5.lock().unwrap()) {
-        Some(b) => match *(f6.lock().unwrap()) {
+    match result.f5 {
+        Some(b) => match result.f6 {
             Some(c) => {
-                let a = (*result).unwrap();
-                thread::spawn(move || h_task(tx, a, b, c, f1, f2, f7, "E"));
+                thread::spawn(move || h_task(tx, r, b, c, result1, "E"));
             }
             None => {}
         },
@@ -187,26 +184,22 @@ fn e_task(
 fn f_task(
     tx: mpsc::Sender<i32>,
     n: i32,
-    f4: Amoi,
-    f5: Amoi,
-    f6: Amoi,
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result2: Arc<Mutex<Result2>>,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("F started at {}", Utc::now().time());
     println!("F activated by Taks D");
 
     thread::sleep(Duration::from_millis(DELAY));
 
-    let mut result = f5.lock().unwrap();
-    *result = Some(n * 5);
+    let mut result = result2.lock().unwrap();
+    let r = n * 5;
+    result.f5 = Some(r);
 
-    match *(f4.lock().unwrap()) {
-        Some(a) => match *(f6.lock().unwrap()) {
+    match result.f4 {
+        Some(a) => match result.f6 {
             Some(c) => {
-                let b = (*result).unwrap();
-                thread::spawn(move || h_task(tx, a, b, c, f1, f2, f7, "F"));
+                thread::spawn(move || h_task(tx, a, r, c, result1, "F"));
             }
             None => {}
         },
@@ -219,26 +212,22 @@ fn f_task(
 fn g_task(
     tx: mpsc::Sender<i32>,
     n: i32,
-    f4: Amoi,
-    f5: Amoi,
-    f6: Amoi,
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result2: Arc<Mutex<Result2>>,
+    result1: Arc<Mutex<Result1>>,
 ) {
     println!("G started at {}", Utc::now().time());
     println!("G activated by Taks D");
 
     thread::sleep(Duration::from_millis(DELAY));
 
-    let mut result = f6.lock().unwrap();
-    *result = Some(n * 6);
+    let mut result = result2.lock().unwrap();
+    let r = n * 6;
+    result.f6 = Some(r);
 
-    match *(f4.lock().unwrap()) {
-        Some(a) => match *(f5.lock().unwrap()) {
+    match result.f4 {
+        Some(a) => match result.f5 {
             Some(b) => {
-                let c = (*result).unwrap();
-                thread::spawn(move || h_task(tx, a, b, c, f1, f2, f7, "G"));
+                thread::spawn(move || h_task(tx, a, b, r, result1, "G"));
             }
             None => {}
         },
@@ -253,9 +242,7 @@ fn h_task(
     n1: i32,
     n2: i32,
     n3: i32,
-    f1: Amoi,
-    f2: Amoi,
-    f7: Amoi,
+    result1: Arc<Mutex<Result1>>,
     parent: &str,
 ) {
     println!("H started at {}", Utc::now().time());
@@ -263,14 +250,14 @@ fn h_task(
 
     thread::sleep(Duration::from_millis(DELAY));
 
-    let mut result = f7.lock().unwrap();
-    *result = Some(n1 + n2 + n3);
+    let mut result = result1.lock().unwrap();
+    let r = n1 + n2 + n3;
+    result.f7 = Some(r);
 
-    match *(f1.lock().unwrap()) {
-        Some(a) => match *(f2.lock().unwrap()) {
+    match result.f1 {
+        Some(a) => match result.f2 {
             Some(b) => {
-                let c = (*result).unwrap();
-                thread::spawn(move || k_task(tx, a, b, c, "H"));
+                thread::spawn(move || k_task(tx, a, b, r, "H"));
             }
             None => {}
         },
