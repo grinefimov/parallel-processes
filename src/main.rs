@@ -5,7 +5,6 @@ use std::time::Duration;
 extern crate chrono;
 
 use std::fs;
-// use std::io;
 use parallel_processes::protocol::*;
 
 const DELAY: u64 = 0;
@@ -42,12 +41,6 @@ fn main() {
     let data = protocol.lock().unwrap().join("\n");
     fs::write(RESULT_PATH, data).unwrap();
     println!("Completed! The protocol is in the {}", RESULT_PATH);
-
-    // let mut option = String::new();
-    // match io::stdin().read_line(&mut option) {
-    //     Ok(_) => {}
-    //     Err(e) => eprintln!("Read error: {}", e),
-    // }
 }
 
 fn a_task(tx: mpsc::Sender<i32>, p: Arc<Mutex<Vec<String>>>) {
@@ -70,11 +63,11 @@ fn a_task(tx: mpsc::Sender<i32>, p: Arc<Mutex<Vec<String>>>) {
         f7: Option::<i32>::None,
     }));
 
-    let txb = mpsc::Sender::clone(&tx);
+    let txb = tx.clone();
     let pb = Arc::clone(&p);
     let result1b = Arc::clone(&result1);
     thread::spawn(move || b_task(txb, pb, ms, result1b));
-    let txc = mpsc::Sender::clone(&tx);
+    let txc = tx.clone();
     let pc = Arc::clone(&p);
     let result1c = Arc::clone(&result1);
     thread::spawn(move || c_task(txc, pc, ms, result1c));
@@ -154,12 +147,12 @@ fn d_task(tx: mpsc::Sender<i32>, p: Arc<Mutex<Vec<String>>>, ms: Ms, result1: Ar
         f6: Option::<i32>::None,
     }));
 
-    let txe = mpsc::Sender::clone(&tx);
+    let txe = tx.clone();
     let pe = Arc::clone(&p);
     let result2e = Arc::clone(&result2);
     let result1e = Arc::clone(&result1);
     thread::spawn(move || e_task(txe, pe, s, result2e, result1e));
-    let txf = mpsc::Sender::clone(&tx);
+    let txf = tx.clone();
     let pf = Arc::clone(&p);
     let result2f = Arc::clone(&result2);
     let result1f = Arc::clone(&result1);
